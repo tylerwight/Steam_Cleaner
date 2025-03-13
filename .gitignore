@@ -1,0 +1,8 @@
+main.o
+imgui.ini
+settings.json
+build
+steam_cleaner
+steam_cleaner.exe
+*.o
+
