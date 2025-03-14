@@ -14,8 +14,8 @@ You will need to install MSYS2.
 
 Open UCRT64 MSYS2 and run:
 ```
-git clone <addr>
-cd steam_cleaner
+git clone https://github.com/tylerwight/Steam_Cleaner
+cd Steam_Cleaner
 mkdir build
 cd build
 cmake ..
