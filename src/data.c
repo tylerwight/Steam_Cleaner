@@ -53,18 +53,18 @@ void sc_populate_steam_data(steam_data *sc_steam){
     sc_populate_steam_libraries(sc_steam, vdf_path);
     sc_populate_steam_games(sc_steam);
 
-    //printf("=====listing libraries:======\n");
-    for (int i = 0; i <= sc_steam->library_paths_count-1; i++){
-        //printf("Library path: %s\n", sc_steam->library_paths[i]);
-    }
-    //printf("=====listing games:======\n");
-    for (int i = 0; i <= sc_steam->games_count-1; i++){
-        //printf("name: %s, path: %s, appid: %d, disksize: %lld, played: %lld\n", sc_steam->games[i].name,
-                                                                                    // sc_steam->games[i].path,
-                                                                                    // sc_steam->games[i].appid,
-                                                                                    // sc_steam->games[i].size_on_disk,
-                                                                                    // sc_steam->games[i].last_played);
-    }
+    // printf("=====listing libraries:======\n");
+    // for (int i = 0; i <= sc_steam->library_paths_count-1; i++){
+    //     printf("Library path: %s\n", sc_steam->library_paths[i]);
+    // }
+    // printf("=====listing games:======\n");
+    // for (int i = 0; i <= sc_steam->games_count-1; i++){
+    //     printf("name: %s, path: %s, appid: %d, disksize: %lld, played: %lld\n", sc_steam->games[i].name,
+    //                                                                                 sc_steam->games[i].path,
+    //                                                                                 sc_steam->games[i].appid,
+    //                                                                                 sc_steam->games[i].size_on_disk,
+    //                                                                                 sc_steam->games[i].last_played);
+    // }
 
 }
 

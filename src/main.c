@@ -11,7 +11,7 @@
 #include "data.h"
 #include <time.h>
 
-#define DEBUG 1
+#define DEBUG 0
 //#define BUFF_MAX 1024
 
 
@@ -155,6 +155,13 @@ void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_u
     ImVec2 screen_size = {ioptr->DisplaySize.x, ioptr->DisplaySize.y};
     igSetNextWindowSize(screen_size, 0);
     igSetNextWindowPos((ImVec2){0,0}, 0, (ImVec2){0,0});
+    static bool select_all = false;
+
+    static bool select_bigger_than = false;
+    static int size;
+
+    static bool select_older_than = false;
+    static int month, day, year;
 
     //main window config
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus;
@@ -168,10 +175,23 @@ void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_u
             }
         }
         if (sc_loaded == true){
-            if (igButton("Select all", (ImVec2){100, 50})){
+            if (igButton("Select games", (ImVec2){100, 50})){
                 for (int i = 0; i < sc_steam->games_count-1; i++){
-                    sc_steam->games[i].selected = true;
+                    if (select_all == true){
+                        sc_steam->games[i].selected = true;
+                    }
+                    if (select_bigger_than == true){
+                        int64_t size_in_bytes = (int64_t)size * 1073741824;
+                        if (sc_steam->games[i].size_on_disk > size_in_bytes){
+                            sc_steam->games[i].selected = true;
+                        }
+
+                    }
+
                 }
+
+
+
             }
             igSameLine(0, 10);
             if (igButton("Deselect all", (ImVec2){100, 50})){
@@ -179,6 +199,44 @@ void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_u
                     sc_steam->games[i].selected = false;
                 }
             }
+            igSameLine(0, 10);
+            igCheckbox("Select all", &select_all);
+
+            if (select_all == true){
+                select_bigger_than = false;
+                select_older_than = false;
+            } else{
+                igSameLine(0, 10);
+                
+                igCheckbox("Bigger than...", &select_bigger_than);
+                if (select_bigger_than == true){
+                    igSameLine(0, 10);
+                    static char slider_text[BUFF_MAX];
+                    snprintf(slider_text, BUFF_MAX, "%dGB", size);
+                    igSetNextItemWidth(100);
+                    igSliderInt(" ", &size, 0, 200, slider_text, 0);
+                }
+                // igSameLine(0, 10);
+                // igCheckbox("Older than...", &select_older_than);
+    
+                
+                if (select_older_than == true){
+                    igSameLine(0, 10);
+                    static char slider_text[BUFF_MAX];
+                    //snprintf(slider_text, BUFF_MAX, "%ddate", size);
+                    igSetNextItemWidth(100);
+                    //igSliderInt(" ", &date, 0, 200, slider_text, 0);
+                    igCombo_Str("Month", &month, "January\0February\0March\0April\0May\0June\0July\0August\0September\0October\0November\0December\0", 5);
+                    igCombo_Str("Day", &day, "1\0 2\0 3\0 4\05\06\07\08\09\010\011\012\013\014\015\016\017\018\019\020\021\022\023\024\025\026\027\028\029\030\031\0", 5);
+                    igCombo_Str("Year", &year, "2005\02006\02007\02008\02009\02010\02011\02012\02013\02014\02015\02016\02017\02018\02019\02020\02021\02022\02023\02024\02025\0", 5);
+                    char buf[100] = {0};
+                    snprintf(buf, 100, "%d/%d/%d", month, day, year);
+                    igText(buf);
+                    
+                }
+            }
+
+
         }
 
 
