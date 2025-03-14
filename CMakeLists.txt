@@ -9,7 +9,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 include_directories(include)
 
 # Source files
-set(SOURCES src/main.c)
+set(SOURCES src/main.c src/data.c)
 
 #set output dir
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
