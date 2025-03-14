@@ -49,34 +49,34 @@ void sc_populate_steam_data(steam_data *sc_steam){
     char vdf_path[BUFF_MAX] = {0};
     strcat(vdf_path, sc_steam->install_path);
     strcat(vdf_path, tmp_path);
-    printf("vdf_path: %s\n", vdf_path);
+    //printf("vdf_path: %s\n", vdf_path);
     sc_populate_steam_libraries(sc_steam, vdf_path);
     sc_populate_steam_games(sc_steam);
 
-    printf("=====listing libraries:======\n");
+    //printf("=====listing libraries:======\n");
     for (int i = 0; i <= sc_steam->library_paths_count-1; i++){
-        printf("Library path: %s\n", sc_steam->library_paths[i]);
+        //printf("Library path: %s\n", sc_steam->library_paths[i]);
     }
-    printf("=====listing games:======\n");
+    //printf("=====listing games:======\n");
     for (int i = 0; i <= sc_steam->games_count-1; i++){
-        printf("name: %s, path: %s, appid: %d, disksize: %lld, played: %lld\n", sc_steam->games[i].name,
-                                                                                    sc_steam->games[i].path,
-                                                                                    sc_steam->games[i].appid,
-                                                                                    sc_steam->games[i].size_on_disk,
-                                                                                    sc_steam->games[i].last_played);
+        //printf("name: %s, path: %s, appid: %d, disksize: %lld, played: %lld\n", sc_steam->games[i].name,
+                                                                                    // sc_steam->games[i].path,
+                                                                                    // sc_steam->games[i].appid,
+                                                                                    // sc_steam->games[i].size_on_disk,
+                                                                                    // sc_steam->games[i].last_played);
     }
 
 }
 
 
 void sc_populate_steam_libraries(steam_data *sc_steam, const char *lib_vdf_path){
-    printf("reading lib file at %s\n", lib_vdf_path);
+    //printf("reading lib file at %s\n", lib_vdf_path);
     DWORD attributes = GetFileAttributes(lib_vdf_path);
     if (attributes == INVALID_FILE_ATTRIBUTES){
         perror("could not find any Steam Libraries. Is steam installed?");
         exit(1);
     } else{
-        printf("found steam library file, reading...\n"); 
+        //printf("found steam library file, reading...\n"); 
     }
 
     FILE *lib_vdf_file = fopen(lib_vdf_path, "r");
@@ -90,7 +90,7 @@ void sc_populate_steam_libraries(steam_data *sc_steam, const char *lib_vdf_path)
 
     while (fgets(line, sizeof(line), lib_vdf_file)){
         if (sscanf(line, "%*[\t ]\"path\" \"%[^\"]\"", lib_path) == 1){
-            printf("found steam library path: %s\n", lib_path);
+            //printf("found steam library path: %s\n", lib_path);
             sc_add_steam_library(sc_steam, lib_path);
         }
     }
@@ -112,7 +112,7 @@ void sc_populate_steam_games(steam_data *sc_steam){
         snprintf(acting_path, BUFF_MAX, "%s%s", sc_steam->library_paths[i], "\\\\steamapps");
         snprintf(search_path, BUFF_MAX, "%s\\*.acf", acting_path);
 
-        printf("acting path: %s\n", acting_path);
+        //printf("acting path: %s\n", acting_path);
 
 
 
@@ -127,7 +127,7 @@ void sc_populate_steam_games(steam_data *sc_steam){
         do{
             char current_file_path[BUFF_MAX] = {0};
             snprintf(current_file_path, BUFF_MAX, "%s\\%s", acting_path, found_files.cFileName);
-            printf("\tFound ACF File: %s\n", current_file_path);
+            //printf("\tFound ACF File: %s\n", current_file_path);
 
 
             FILE *game_file = fopen(current_file_path, "r");
@@ -198,22 +198,70 @@ void sc_add_steam_game(steam_data *sc_steam, steam_game *game){
         perror("Failed to allocate memory for game data");
         exit(1);
     }
-
-    // steam_game tmp_game = {0};
-    // strcat(tmp_game.name, game->name);
-    // strcat(tmp_game.path, game->path);
-    // tmp_game.appid = game->appid;
-    // tmp_game.size_on_disk = game->size_on_disk;
-    // tmp_game.last_played = game->last_played;
-    
-
-
     sc_steam->games[sc_steam->games_count] = *game;
-    // printf("===Added game:\n nam %s\n path %s\n appd %d\n disk %lld\n played %lld\n", sc_steam->games[sc_steam->games_count].name,
-    //                                          sc_steam->games[sc_steam->games_count].path,
-    //                                          sc_steam->games[sc_steam->games_count].appid,
-    //                                          sc_steam->games[sc_steam->games_count].size_on_disk,
-    //                                          sc_steam->games[sc_steam->games_count].last_played);
-
     sc_steam->games_count += 1;
+}
+
+
+void sc_free_steam_data(steam_data *sc_steam){
+    if (!sc_steam) return;
+
+    for (int i = 0; i < sc_steam->library_paths_count; i++) {
+        free(sc_steam->library_paths[i]);
+    }
+    free(sc_steam->library_paths);
+    sc_steam->library_paths = NULL;
+    sc_steam->library_paths_count = 0;
+
+    free(sc_steam->games);
+    sc_steam->games = NULL;
+    sc_steam->games_count = 0;
+}
+
+
+void sc_repopulate_steam_games(steam_data *sc_steam){
+    sc_free_steam_data(sc_steam);
+    sc_populate_steam_data(sc_steam);
+
+}
+
+sc_uninstall_stack *us_create_node(sc_uninstall_stack *input){
+    sc_uninstall_stack *newnode = (sc_uninstall_stack*) malloc (sizeof(sc_uninstall_stack));
+    if (newnode == NULL){
+        printf("error allocating memory");
+        exit(1);
+    }
+    
+    newnode->game = input->game;
+    newnode->next = NULL;
+    return newnode;
+}
+
+void us_push(sc_uninstall_stack **head, sc_uninstall_stack *input){
+    sc_uninstall_stack *newnode = us_create_node(input);
+    newnode->next = *head;
+    *head = newnode;
+    
+}
+
+void us_pop(sc_uninstall_stack **head){
+    if (head == NULL || *head == NULL) {
+        printf("List is already empty.\n");
+        return;
+    }
+
+    sc_uninstall_stack *temp = *head;
+    *head = temp->next;
+    free(temp);
+}
+
+
+void us_print(sc_uninstall_stack *head){
+    sc_uninstall_stack *current = head;
+    printf("STACK (Top->Bottom): ");
+    while (current != NULL){
+        printf("%s <>", current->game->name);
+        current = current->next;
+    }
+    printf("\n");
 }

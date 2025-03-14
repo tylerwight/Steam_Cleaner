@@ -11,23 +11,19 @@
 #include "data.h"
 #include <time.h>
 
-#define DEBUG 0
-#define BUFF_MAX 1024
-#define LOG_BUFF_MAX 8192
+#define DEBUG 1
+//#define BUFF_MAX 1024
 
 
-typedef struct {
-    char buffer[LOG_BUFF_MAX];
-    int buffer_length;
 
-} sc_log;
 
 
 void sc_cleanup( SDL_Window *window, SDL_GLContext *context);
 void sc_render(SDL_Window *window, SDL_GLContext *context, ImGuiIO *ioptr, ImVec4 *clear_color);
-void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log);
+void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_uninstall_stack **uninstall_list);
 void sc_start_frame();
-void sc_debug_window(ImGuiIO *ioptr);
+void sc_debug_window(ImGuiIO *ioptr, steam_data *sc_steam);
+void sc_uninstall_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_uninstall_stack **uninstall_list);
 
 
 void append_to_log(char *log_buffer, int *log_buffer_len, const char *message) {
@@ -86,6 +82,9 @@ int compare_games(void *sortSpecs, const void *a, const void *b ) {
     return 0; // If all compared columns are equal
 }
 
+bool sc_uninstalling = false;
+bool sc_loaded = false;
+
 
 int main(int argc, char* argv[]){
     //setup SDL and OpenGL
@@ -110,7 +109,7 @@ int main(int argc, char* argv[]){
     ImVec4 clear_color = {0.45f, 0.55f, 0.60f, 1.00f};
     sc_log sc_log = {0};
     steam_data sc_steam = {0};
-    //sc_populate_steam_data(&sc_steam);
+    sc_uninstall_stack *uninstall_list = NULL;
 
     //main loop
     bool quit = false;
@@ -121,11 +120,16 @@ int main(int argc, char* argv[]){
         sc_start_frame();
 
         //application actions
-        sc_config_window(ioptr, &sc_steam, &sc_log);
+        sc_config_window(ioptr, &sc_steam, &sc_log, &uninstall_list);
+
+        if (sc_uninstalling == true){
+            sc_uninstall_window(ioptr, &sc_steam, &sc_log, &uninstall_list);
+        }
+        
 
 
         if (DEBUG == 1){
-            sc_debug_window(ioptr);
+            sc_debug_window(ioptr, &sc_steam);
         }
 
 
@@ -146,7 +150,7 @@ int main(int argc, char* argv[]){
 
 
 
-void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log){
+void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_uninstall_stack **uninstall_list){
     //resize window to viewport
     ImVec2 screen_size = {ioptr->DisplaySize.x, ioptr->DisplaySize.y};
     igSetNextWindowSize(screen_size, 0);
@@ -155,16 +159,15 @@ void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log){
     //main window config
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus;
     {
-        static bool loaded = false;
         //bool *selected = calloc(sc_steam->games_count, sizeof(bool));
         igBegin("Steam Cleaner", NULL, flags);
-        if (loaded == false){
+        if (sc_loaded == false){
             if (igButton("Load Games", (ImVec2){100, 50})){
                 sc_populate_steam_data(sc_steam);
-                loaded = true;
+                sc_loaded = true;
             }
         }
-        if (loaded == true){
+        if (sc_loaded == true){
             if (igButton("Select all", (ImVec2){100, 50})){
                 for (int i = 0; i < sc_steam->games_count-1; i++){
                     sc_steam->games[i].selected = true;
@@ -220,23 +223,29 @@ void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log){
             igEndTable();
         }
 
-        if (loaded == 1){
+        if (sc_loaded == 1 && sc_uninstalling == 0){
             if (igButton("Uninstall Selected", (ImVec2){150, 50})){
                 for (int i = 0; i < sc_steam->games_count-1; i++){
                     if (sc_steam->games[i].selected == 1){
+                        sc_uninstall_stack input = {0};
+                        input.game = &sc_steam->games[i];
+                        us_push(uninstall_list, &input);
                         char output_buffer[BUFF_MAX] = {0};
-                        snprintf(output_buffer, BUFF_MAX, "%s%s", "Trying to uninstall: ", sc_steam->games[i].name);
+                        snprintf(output_buffer, BUFF_MAX, "Added %s to the uninstall list", sc_steam->games[i].name);
                         append_to_log(sc_log->buffer, &sc_log->buffer_length,output_buffer);
 
-                        char shell_command[BUFF_MAX] = {0};
-                        snprintf(shell_command, BUFF_MAX, "%s%s", "start /wait steam://uninstall/", sc_steam->games[i].appid_str);
-                        append_to_log(sc_log->buffer, &sc_log->buffer_length, shell_command);
-                        //ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
-                        system(shell_command);
+                        // char shell_command[BUFF_MAX] = {0};
+                        // snprintf(shell_command, BUFF_MAX, "%s%s", "start /wait steam://uninstall/", sc_steam->games[i].appid_str);
+                        // append_to_log(sc_log->buffer, &sc_log->buffer_length, shell_command);
+                        // //ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
+                        // system(shell_command);
                     }
 
 
                 }
+                printf("created uninstall stack of these items:\n");
+                us_print(*uninstall_list);
+                sc_uninstalling = 1;
                 
 
             }
@@ -290,16 +299,67 @@ void sc_start_frame(){
 }
 
 
+void sc_uninstall_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_uninstall_stack **uninstall_list){
+    //main window config
+    ImGuiWindowFlags flags = 0;
+    ImVec2 window_size = {0};
+    igGetWindowSize(&window_size);
+    {
+        
+        igBegin("Uninstalling", NULL, flags );
 
-void sc_debug_window(ImGuiIO *ioptr){
+        if (*uninstall_list == NULL){
+            if (sc_uninstalling == true){
+                sc_uninstalling = false;
+                sc_repopulate_steam_games(sc_steam);
+            }
+            igTextWrapped("No games in uninstall list. This window shouldn't be open, this is a bug.");
+            igEnd();
+            return;
+            
+        }
+
+        igSetWindowSize_Str("Uninstalling", (ImVec2){600,200}, ImGuiCond_FirstUseEver);
+        igTextWrapped("Because of Steam's config, I cannot uninstall the games automatically without prompting you. We could just delete the game files without Steam, but this would leave bits left over in your registry.\n");
+        igTextWrapped("I also can't click 'yes' for you when prompted.\n\nSo in lieu of a better option. Click this button to tell steam to uninstall next game, then confirm on steam, and repeat until all games in the list are gone.");
+        
+        char tmp_buffer[BUFF_MAX] = {0};
+        char game_name[BUFF_MAX] = {0};
+
+        snprintf(game_name, BUFF_MAX, "%s", (*uninstall_list)->game->name);
+        snprintf(tmp_buffer, BUFF_MAX, "%s%s", "Uninstall ", game_name);
+
+        if (igButton(tmp_buffer, (ImVec2){igGetWindowWidth() - 15,50} )){
+            memset(tmp_buffer, 0, sizeof(tmp_buffer));
+            snprintf(tmp_buffer, BUFF_MAX, "Uninstalling %s. Click the confirmation on the steam popup.", game_name);
+            append_to_log(sc_log->buffer, &sc_log->buffer_length, tmp_buffer);
+
+            char shell_command[BUFF_MAX] = {0};
+            snprintf(shell_command, BUFF_MAX, "%s%s", "steam://uninstall/", (*uninstall_list)->game->appid_str);
+            append_to_log(sc_log->buffer, &sc_log->buffer_length, shell_command);
+            ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
+            us_pop(uninstall_list);
+        }
+        igEnd();
+    }
+    
+    return;
+}
+
+
+void sc_debug_window(ImGuiIO *ioptr, steam_data *sc_steam){
 
 
     //main window config
     ImGuiWindowFlags flags = 0;
+    
     {
         
         igBegin("Debug", NULL, flags );
         //igText("Input char length: %d", strlen(log_buffer));
+        if (igButton("repopulate", (ImVec2){0,0})){
+            sc_repopulate_steam_games(sc_steam);
+        }
         igText("%.3f ms/frame (%.1f FPS)", 1000.0f / igGetIO()->Framerate, igGetIO()->Framerate);
         igEnd();
     }
