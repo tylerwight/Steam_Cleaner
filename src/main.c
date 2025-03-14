@@ -9,19 +9,82 @@
 #include <GL/glu.h>
 #include "sdl_util.c"
 #include "data.h"
+#include <time.h>
 
 #define DEBUG 0
 #define BUFF_MAX 1024
+#define LOG_BUFF_MAX 8192
 
 
+typedef struct {
+    char buffer[LOG_BUFF_MAX];
+    int buffer_length;
+
+} sc_log;
 
 
 void sc_cleanup( SDL_Window *window, SDL_GLContext *context);
 void sc_render(SDL_Window *window, SDL_GLContext *context, ImGuiIO *ioptr, ImVec4 *clear_color);
-void sc_config_window(ImGuiIO *ioptr, char *input_buffer);
+void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log);
 void sc_start_frame();
-void sc_debug_window(ImGuiIO *ioptr, char *input_buffer);
+void sc_debug_window(ImGuiIO *ioptr);
 
+
+void append_to_log(char *log_buffer, int *log_buffer_len, const char *message) {
+    int msg_len = strlen(message);
+
+    if (*log_buffer_len + msg_len < BUFF_MAX - 1) {
+        strcat(log_buffer, message);
+        strcat(log_buffer, "\n");  // New line for each entry
+        *log_buffer_len += msg_len + 1;
+    } else {
+        strcpy(log_buffer, "Log buffer full!\n");
+        *log_buffer_len = strlen(log_buffer);
+    }
+}
+
+int compare_games(void *sortSpecs, const void *a, const void *b ) {
+    const steam_game *gameA = (const steam_game *)a;
+    const steam_game *gameB = (const steam_game *)b;
+    ImGuiTableSortSpecs *specs = (ImGuiTableSortSpecs *)sortSpecs;
+
+    for (int i = 0; i < specs->SpecsCount; i++) {
+        ImGuiTableColumnSortSpecs *col = &specs->Specs[i];
+
+        int result = 0;
+        switch (col->ColumnIndex) {
+            case 0:  // AppID (int comparison)
+                result = gameA->appid - gameB->appid;
+                break;
+            case 1:  // Name (string comparison)
+                result = strcmp(gameA->name, gameB->name);
+                break;
+            case 2:  // Size on disk (int64_t comparison)
+                result = (gameA->size_on_disk > gameB->size_on_disk) - 
+                         (gameA->size_on_disk < gameB->size_on_disk);
+                break;
+            case 3:  // Last played (int64_t comparison)
+                result = (gameA->last_played > gameB->last_played) - 
+                         (gameA->last_played < gameB->last_played);
+                break;
+            case 4:  // Path (string comparison)
+                result = strcmp(gameA->path, gameB->path);
+                break;
+        }
+
+        // Apply ascending/descending order
+        if (col->SortDirection == ImGuiSortDirection_Descending) {
+            result = -result;
+        }
+
+        // If comparison result is non-zero, return it
+        if (result != 0) {
+            return result;
+        }
+    }
+    
+    return 0; // If all compared columns are equal
+}
 
 
 int main(int argc, char* argv[]){
@@ -45,10 +108,9 @@ int main(int argc, char* argv[]){
 
     //Application vars
     ImVec4 clear_color = {0.45f, 0.55f, 0.60f, 1.00f};
-    char input_buffer[BUFF_MAX] = {0};
+    sc_log sc_log = {0};
     steam_data sc_steam = {0};
-
-    sc_populate_steam_data(&sc_steam);
+    //sc_populate_steam_data(&sc_steam);
 
     //main loop
     bool quit = false;
@@ -59,11 +121,11 @@ int main(int argc, char* argv[]){
         sc_start_frame();
 
         //application actions
-        sc_config_window(ioptr, input_buffer);
+        sc_config_window(ioptr, &sc_steam, &sc_log);
 
 
         if (DEBUG == 1){
-            sc_debug_window(ioptr, input_buffer);
+            sc_debug_window(ioptr);
         }
 
 
@@ -84,24 +146,7 @@ int main(int argc, char* argv[]){
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-void sc_config_window(ImGuiIO *ioptr, char *input_buffer){
+void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log){
     //resize window to viewport
     ImVec2 screen_size = {ioptr->DisplaySize.x, ioptr->DisplaySize.y};
     igSetNextWindowSize(screen_size, 0);
@@ -110,15 +155,98 @@ void sc_config_window(ImGuiIO *ioptr, char *input_buffer){
     //main window config
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus;
     {
-        
+        static bool loaded = false;
+        //bool *selected = calloc(sc_steam->games_count, sizeof(bool));
         igBegin("Steam Cleaner", NULL, flags);
-        igText("test text box");
+        if (loaded == false){
+            if (igButton("Load Games", (ImVec2){100, 50})){
+                sc_populate_steam_data(sc_steam);
+                loaded = true;
+            }
+        }
+        if (loaded == true){
+            if (igButton("Select all", (ImVec2){100, 50})){
+                for (int i = 0; i < sc_steam->games_count-1; i++){
+                    sc_steam->games[i].selected = true;
+                }
+            }
+            igSameLine(0, 10);
+            if (igButton("Deselect all", (ImVec2){100, 50})){
+                for (int i = 0; i < sc_steam->games_count-1; i++){
+                    sc_steam->games[i].selected = false;
+                }
+            }
+        }
 
-        igInputTextMultiline(" ", input_buffer, BUFF_MAX, (ImVec2){400, 300}, 0, NULL, NULL);
-        igSameLine(0,75);
-        igText("Test");
+
+
+        if (igBeginTable("ItemTable", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | 
+                                         ImGuiTableFlags_Sortable |
+                                         ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | 
+                                         ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY,
+                                         (ImVec2){ioptr->DisplaySize.x - 10, ioptr->DisplaySize.y - 150}, 0)) {
+            // Create table headers
+            igTableSetupColumn("AppID", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 100, 0);
+            igTableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 200, 0);
+            igTableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 150, 0);
+            igTableSetupColumn("Last Played", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 150, 0);
+            igTableSetupColumn("Path", ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort, 0, 0);
+            igTableHeadersRow();
+
+            ImGuiTableSortSpecs* sortSpecs = igTableGetSortSpecs();
+            if (sortSpecs && sortSpecs->SpecsDirty) {
+                sortSpecs->SpecsDirty = false;
+                // Sort games array based on selected column
+                qsort_s(sc_steam->games, sc_steam->games_count, sizeof(steam_game), 
+                    compare_games, (void *)sortSpecs);   
+            }
+
+    
+    
+            for (int i = 0; i < sc_steam->games_count-1; i++) {
+                igTableNextRow(0, 0);
+                igTableSetColumnIndex(0);
+                //igText(sc_steam->games[i].appid_str);
+                igCheckbox(sc_steam->games[i].appid_str, &sc_steam->games[i].selected);
+                igTableSetColumnIndex(1);
+                igText(sc_steam->games[i].name);
+                igTableSetColumnIndex(2);
+                igText(sc_steam->games[i].size_on_disk_str);
+                igTableSetColumnIndex(3);
+                igText(sc_steam->games[i].last_played_pretty);
+                igTableSetColumnIndex(4);
+                igText(sc_steam->games[i].path);
+            }
+            igEndTable();
+        }
+
+        if (loaded == 1){
+            if (igButton("Uninstall Selected", (ImVec2){150, 50})){
+                for (int i = 0; i < sc_steam->games_count-1; i++){
+                    if (sc_steam->games[i].selected == 1){
+                        char output_buffer[BUFF_MAX] = {0};
+                        snprintf(output_buffer, BUFF_MAX, "%s%s", "Trying to uninstall: ", sc_steam->games[i].name);
+                        append_to_log(sc_log->buffer, &sc_log->buffer_length,output_buffer);
+
+                        char shell_command[BUFF_MAX] = {0};
+                        snprintf(shell_command, BUFF_MAX, "%s%s", "start /wait steam://uninstall/", sc_steam->games[i].appid_str);
+                        append_to_log(sc_log->buffer, &sc_log->buffer_length, shell_command);
+                        //ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
+                        system(shell_command);
+                    }
+
+
+                }
+                
+
+            }
+            igSameLine(0, 10);
+        }
 
         
+        igBeginChild_Str("log_scroll", (ImVec2){0, 0}, 0, ImGuiWindowFlags_HorizontalScrollbar);
+        igText(sc_log->buffer);  // Display log messages
+        igEndChild();
 
         igEnd();
     }
@@ -163,7 +291,7 @@ void sc_start_frame(){
 
 
 
-void sc_debug_window(ImGuiIO *ioptr, char *input_buffer){
+void sc_debug_window(ImGuiIO *ioptr){
 
 
     //main window config
@@ -171,7 +299,7 @@ void sc_debug_window(ImGuiIO *ioptr, char *input_buffer){
     {
         
         igBegin("Debug", NULL, flags );
-        igText("Input char length: %d", strlen(input_buffer));
+        //igText("Input char length: %d", strlen(log_buffer));
         igText("%.3f ms/frame (%.1f FPS)", 1000.0f / igGetIO()->Framerate, igGetIO()->Framerate);
         igEnd();
     }

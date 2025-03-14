@@ -1,6 +1,36 @@
 #include "data.h"
 
 
+void convert_unix_to_date(int64_t unix_time, char *buffer, size_t buffer_size) {
+    struct tm time_info;
+    time_t time_val = (time_t)unix_time;  // Cast int64_t to time_t
+
+    if (localtime_s(&time_info, &time_val) == 0) {
+        strftime(buffer, buffer_size, "%m/%d/%y", &time_info);  // Format MM/DD/YY
+    } else {
+        snprintf(buffer, buffer_size, "Invalid Date");  // Handle failure
+    }
+}
+
+void byte_to_human(uint64_t size_in_bytes, char *output, size_t output_size) {
+    const char *units[] = {"B", "KB", "MB", "GB", "TB", "PB"};
+    int unit_index = 0;
+    double size = (double)size_in_bytes;
+
+    // Convert to the largest appropriate unit
+    while (size >= 1024.0 && unit_index < 5) {
+        size /= 1024.0;
+        unit_index++;
+    }
+
+    // Format the result with a whole number if possible
+    if (size - (int)size == 0) {
+        snprintf(output, output_size, "%d %s", (int)size, units[unit_index]);
+    } else {
+        snprintf(output, output_size, "%.1f %s", size, units[unit_index]);
+    }
+}
+
 void sc_populate_steam_data(steam_data *sc_steam){
     //steam_data sc_steam = {0};
     DWORD steam_path_size = {BUFF_MAX};
@@ -106,33 +136,38 @@ void sc_populate_steam_games(steam_data *sc_steam){
                 exit(1);
             }
         
-            char name[BUFF_MAX] = {0};
-            char path[BUFF_MAX] = {0};
-            char appid[BUFF_MAX] = {0};
-            char size_on_disk[BUFF_MAX] = {0};
-            char last_played[BUFF_MAX] = {0};
-            
+
+            steam_game tmp_game = {0};
+            char tmp_path[BUFF_MAX] = {0}; 
             char line[BUFF_MAX];
             while (fgets(line, sizeof(line), game_file)){
-                if (sscanf(line, "%*[\t ]\"name\" \"%[^\"]\"", name) == 1){
+                if (sscanf(line, "%*[\t ]\"name\" \"%[^\"]\"", tmp_game.name) == 1){
                     //printf("\t\tfound name: %s\n", name);
-                }
-                if (sscanf(line, "%*[\t ]\"installdir\" \"%[^\"]\"", path) == 1){
+                }else if (sscanf(line, "%*[\t ]\"installdir\" \"%[^\"]\"", tmp_path) == 1){
+                    snprintf(tmp_game.path, BUFF_MAX, "%s\\%s\\%s", acting_path, "common", tmp_path);
                     //printf("\t\tfound path: %s\n", path);
-                }
-                if (sscanf(line, "%*[\t ]\"appid\" \"%[^\"]\"", appid) == 1){
+                }else if (sscanf(line, "%*[\t ]\"appid\" \"%[^\"]\"", tmp_game.appid_str) == 1){
                     //printf("\t\tfound appid: %s\n", appid);
-                }
-                if (sscanf(line, "%*[\t ]\"SizeOnDisk\" \"%[^\"]\"", size_on_disk) == 1){
+                    tmp_game.appid = atoi(tmp_game.appid_str);
+                }else if (sscanf(line, "%*[\t ]\"SizeOnDisk\" \"%[^\"]\"", tmp_game.size_on_disk_str) == 1){
                     //printf("\t\tfound size_on_disk: %s\n", size_on_disk);
-                }
-                if (sscanf(line, "%*[\t ]\"LastPlayed\" \"%[^\"]\"", last_played) == 1){
+                    tmp_game.size_on_disk = strtoll(tmp_game.size_on_disk_str, NULL, 10);
+                    byte_to_human(tmp_game.size_on_disk, tmp_game.size_on_disk_str, BUFF_MAX);
+                }else if (sscanf(line, "%*[\t ]\"LastPlayed\" \"%[^\"]\"", tmp_game.last_played_str) == 1){
+                    tmp_game.last_played = strtoll(tmp_game.last_played_str, NULL, 10);
+                    
                     //printf("\t\tfound last_played: %s\n", last_played);
                 }
                 
             }
+            if (tmp_game.last_played == 0){
+                snprintf(tmp_game.last_played_str, BUFF_MAX, "%s", "no data");
+                snprintf(tmp_game.last_played_pretty, BUFF_MAX, "%s", "no data");
+            } else {
+                convert_unix_to_date(tmp_game.last_played, tmp_game.last_played_pretty, BUFF_MAX);
+            }
             //printf("adding game with disk size: %s (converted: %lld)\n", size_on_disk, strtoll(size_on_disk, NULL, 10));
-            sc_add_steam_game(sc_steam, name, path, atoi(appid), strtoll(size_on_disk, NULL, 10), strtoll(last_played, NULL, 10));
+            sc_add_steam_game(sc_steam, &tmp_game);
             
             fclose(game_file);
         } while (FindNextFile(h_find, &found_files) != 0);
@@ -157,22 +192,23 @@ void sc_add_steam_library(steam_data *sc_steam, const char *path){
 }
 
 
-void sc_add_steam_game(steam_data *sc_steam, const char *name, const char *path, int appid, int64_t size_on_disk, int64_t last_played){
+void sc_add_steam_game(steam_data *sc_steam, steam_game *game){
     sc_steam->games = realloc(sc_steam->games, sizeof(steam_game) * (sc_steam->games_count + 1));
     if (sc_steam->games == NULL){
         perror("Failed to allocate memory for game data");
         exit(1);
     }
 
-    steam_game tmp_game = {0};
-    strcat(tmp_game.name, name);
-    strcat(tmp_game.path, path);
-    tmp_game.appid = appid;
-    tmp_game.size_on_disk = size_on_disk;
-    tmp_game.last_played = last_played;
+    // steam_game tmp_game = {0};
+    // strcat(tmp_game.name, game->name);
+    // strcat(tmp_game.path, game->path);
+    // tmp_game.appid = game->appid;
+    // tmp_game.size_on_disk = game->size_on_disk;
+    // tmp_game.last_played = game->last_played;
+    
 
 
-    sc_steam->games[sc_steam->games_count] = tmp_game;
+    sc_steam->games[sc_steam->games_count] = *game;
     // printf("===Added game:\n nam %s\n path %s\n appd %d\n disk %lld\n played %lld\n", sc_steam->games[sc_steam->games_count].name,
     //                                          sc_steam->games[sc_steam->games_count].path,
     //                                          sc_steam->games[sc_steam->games_count].appid,
