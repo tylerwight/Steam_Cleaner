@@ -14,7 +14,14 @@ Steam Cleaner is written entirely in C, interfacing with win32 and using cimgui 
 # How to Build
 You will need to install MSYS2.
 
-Open UCRT64 MSYS2 and run:
+- Open UCRT64 MSYS2
+- get build tools if you don't already have them
+```
+pacman -S mingw-w64-ucrt-x86_64-gcc
+pacman -S git
+pacman -S mingw-w64-ucrt-x86_64-cmake
+```
+- you may need to close and reopen UCRT64 MSYS2 if the above were just freshly installed.
 ```
 git clone https://github.com/tylerwight/Steam_Cleaner
 cd Steam_Cleaner
