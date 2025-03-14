@@ -5,6 +5,8 @@ This is an application that helps you clean up your steam library. With steam cl
 - manually skip specific games
 - manually choose a list of games to uninstall
 
+![alt text](assets\image.png)
+
 # About
 Steam Cleaner is written entirely in C, interfacing with win32 and using cimgui to interface with Dear Imgui
 
