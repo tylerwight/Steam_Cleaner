@@ -55,6 +55,7 @@ sc_uninstall_stack *us_create_node(sc_uninstall_stack *input);
 void us_push(sc_uninstall_stack **head, sc_uninstall_stack *input);
 void us_pop(sc_uninstall_stack **head);
 void us_print(sc_uninstall_stack *head);
+void us_clear(sc_uninstall_stack **head);
 
 
 

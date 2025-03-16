@@ -291,12 +291,6 @@ void sc_config_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, sc_u
                         char output_buffer[BUFF_MAX] = {0};
                         snprintf(output_buffer, BUFF_MAX, "Added %s to the uninstall list", sc_steam->games[i].name);
                         append_to_log(sc_log->buffer, &sc_log->buffer_length,output_buffer);
-
-                        // char shell_command[BUFF_MAX] = {0};
-                        // snprintf(shell_command, BUFF_MAX, "%s%s", "start /wait steam://uninstall/", sc_steam->games[i].appid_str);
-                        // append_to_log(sc_log->buffer, &sc_log->buffer_length, shell_command);
-                        // //ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
-                        // system(shell_command);
                     }
 
 
@@ -397,6 +391,13 @@ void sc_uninstall_window(ImGuiIO *ioptr, steam_data *sc_steam, sc_log *sc_log, s
             append_to_log(sc_log->buffer, &sc_log->buffer_length, shell_command);
             ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
             us_pop(uninstall_list);
+        }
+
+        if (igButton("Cancel", (ImVec2){0,0})){
+            us_clear(uninstall_list);
+            append_to_log(sc_log->buffer, &sc_log->buffer_length, "Canceling and clearing uninstall list");
+            sc_uninstalling = 0;
+
         }
         igEnd();
     }

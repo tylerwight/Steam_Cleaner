@@ -265,3 +265,10 @@ void us_print(sc_uninstall_stack *head){
     }
     printf("\n");
 }
+
+
+void us_clear(sc_uninstall_stack **head){
+    while (*head != NULL){
+        us_pop(head);
+    }
+}
