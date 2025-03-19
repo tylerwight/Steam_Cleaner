@@ -1,18 +1,11 @@
 #ifndef UI_H
 #define UI_H
 #include "steam_cleaner.h"
+#include <SDL2/SDL.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 #include "data.h"
-// #include <stdio.h>
-// #include <stdbool.h>
-// #include <time.h>
-// #include <SDL2/SDL.h>
-// #include <windows.h>
-// #include <GL/gl.h>
-// #include <GL/glu.h>
-// #include "data.h"
-// #include "config.h"
-
-
+#include "data_structs.h"
 
 
 void sc_cleanup( SDL_Window *window, SDL_GLContext *context);
