@@ -7,9 +7,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 include_directories(include)
+include_directories(${PROJECT_SOURCE_DIR}/include/cimgui)
 
 # Source files
-set(SOURCES src/main.c src/data.c)
+set(SOURCES src/main.c src/data.c src/sdl_helpers.c src/ui.c)
 
 #set output dir
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -35,7 +36,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         "${UCRT_BIN_DIR}/libstdc++-6.dll"
         "${UCRT_BIN_DIR}/libwinpthread-1.dll"
         "${UCRT_BIN_DIR}/SDL2.dll"
-        "${CMAKE_SOURCE_DIR}/include/cimgui_sdl.dll"
+        "${CMAKE_SOURCE_DIR}/include/cimgui/cimgui_sdl.dll"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
 )
 
@@ -52,7 +53,7 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "")
 set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE ON)
 
 # Library to link against for Windows
-set(CIMGUI_LIB ${CMAKE_SOURCE_DIR}/include/cimgui_sdl.dll)
+set(CIMGUI_LIB ${CMAKE_SOURCE_DIR}/include/cimgui/cimgui_sdl.dll)
 
 
 # Function to check if a package exists and install it (MSYS2)

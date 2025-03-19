@@ -1,8 +1,6 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
+#include "sdl_helpers.h"
+
+
 
 
 bool sdl_main_loop(SDL_Window *window){

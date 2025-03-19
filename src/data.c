@@ -225,6 +225,11 @@ void sc_repopulate_steam_games(steam_data *sc_steam){
 
 }
 
+
+
+
+
+
 sc_uninstall_stack *us_create_node(sc_uninstall_stack *input){
     sc_uninstall_stack *newnode = (sc_uninstall_stack*) malloc (sizeof(sc_uninstall_stack));
     if (newnode == NULL){
