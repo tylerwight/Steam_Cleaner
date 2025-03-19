@@ -265,7 +265,7 @@ void us_print(sc_uninstall_stack *head){
     sc_uninstall_stack *current = head;
     printf("STACK (Top->Bottom): ");
     while (current != NULL){
-        printf("%s <>", current->game->name);
+        printf("%s (%p)<>", current->game->name, current->next);
         current = current->next;
     }
     printf("\n");

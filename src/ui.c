@@ -29,7 +29,7 @@ void sc_config_window(ImGuiIO *ioptr, sc_steam_cleaner *app){
     static int month, day, year;
 
     steam_data *sc_steam = app->steam_data;
-    sc_uninstall_stack *uninstall_list = app->uninstall_list;
+    sc_uninstall_stack **uninstall_list = &(app->uninstall_list);
 
     //main window config
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBringToFrontOnFocus;
@@ -155,7 +155,7 @@ void sc_config_window(ImGuiIO *ioptr, sc_steam_cleaner *app){
                     if (sc_steam->games[i].selected == 1){
                         sc_uninstall_stack input = {0};
                         input.game = &sc_steam->games[i];
-                        us_push(&uninstall_list, &input);
+                        us_push(uninstall_list, &input);
                         char output_buffer[BUFF_MAX] = {0};
                         snprintf(output_buffer, BUFF_MAX, "Added %s to the uninstall list", sc_steam->games[i].name);
                         append_to_log(app->log.buffer, &(app->log.buffer_length), output_buffer);
@@ -164,8 +164,8 @@ void sc_config_window(ImGuiIO *ioptr, sc_steam_cleaner *app){
 
                 }
                 printf("created uninstall stack of these items:\n");
-                us_print(uninstall_list);
-                app->uninstalling = 1;
+                us_print(*uninstall_list);
+                app->uninstalling = true;
                 
 
             }
@@ -226,12 +226,12 @@ void sc_uninstall_window(ImGuiIO *ioptr, sc_steam_cleaner *app){
     igGetWindowSize(&window_size);
 
     steam_data *sc_steam = app->steam_data;
-    sc_uninstall_stack *uninstall_list = app->uninstall_list;
+
     {
         
         igBegin("Uninstalling", NULL, flags );
 
-        if (uninstall_list == NULL){
+        if (app->uninstall_list == NULL){
             if (app->uninstalling == true){
                 app->uninstalling = false;
                 sc_repopulate_steam_games(sc_steam);
@@ -249,23 +249,24 @@ void sc_uninstall_window(ImGuiIO *ioptr, sc_steam_cleaner *app){
         char tmp_buffer[BUFF_MAX] = {0};
         char game_name[BUFF_MAX] = {0};
 
-        snprintf(game_name, BUFF_MAX, "%s", uninstall_list->game->name);
+        snprintf(game_name, BUFF_MAX, "%s", app->uninstall_list->game->name);
         snprintf(tmp_buffer, BUFF_MAX, "%s%s", "Uninstall ", game_name);
 
         if (igButton(tmp_buffer, (ImVec2){igGetWindowWidth() - 15,50} )){
+            us_print(app->uninstall_list);
             memset(tmp_buffer, 0, sizeof(tmp_buffer));
             snprintf(tmp_buffer, BUFF_MAX, "Uninstalling %s. Click the confirmation on the steam popup.", game_name);
             append_to_log(app->log.buffer, &(app->log.buffer_length), tmp_buffer);
 
             char shell_command[BUFF_MAX] = {0};
-            snprintf(shell_command, BUFF_MAX, "%s%s", "steam://uninstall/", uninstall_list->game->appid_str);
+            snprintf(shell_command, BUFF_MAX, "%s%s", "steam://uninstall/", app->uninstall_list->game->appid_str);
             append_to_log(app->log.buffer, &(app->log.buffer_length), shell_command);
             ShellExecute(NULL, "open", shell_command, NULL, NULL, SW_SHOWNORMAL);
-            us_pop(&uninstall_list);
+            us_pop(&(app->uninstall_list));
         }
 
         if (igButton("Cancel", (ImVec2){0,0})){
-            us_clear(&uninstall_list);
+            us_clear(&(app->uninstall_list));
             append_to_log(app->log.buffer, &(app->log.buffer_length), "Canceling and clearing uninstall list");
             app->uninstalling = 0;
 
